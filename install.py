@@ -6,7 +6,7 @@ try:
     with open("smdb-backup.service.template", 'r') as f:
         service = f.read(-1)
     service = service.replace(
-        "<folder_path>", f'{getcwdb().decode("utf-8")}').replace("file_name", "smdb_backup.py")
+        "<folder_path>", f'{getcwdb().decode("utf-8")}').replace("<file_name>", "smdb_backup.py")
     with open("/etc/systemd/system/smdb-backup.service", "w") as f:
         f.write(service)
     subprocess.call(["sudo", "systemctl", "daemon-reload"])
