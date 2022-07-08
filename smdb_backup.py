@@ -111,7 +111,7 @@ def files_sent(message: Message):
                     os.system(
                         ["sudo", "chgroup", settings.user_to_own, file_path])
                 if settings.group_to_own is not None or settings.user_to_own is not None:
-                    os.system(["sudo", "chgroup" "777", file_path])
+                    os.system(["sudo", "chgroup", "777", file_path])
                 logger.debug(f"File saved to {file_path}")
         return
     except Exception as ex:
