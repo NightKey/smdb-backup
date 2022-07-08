@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, Union
+from typing import Dict, List
 from smdb_api import API, Message
 import time
 import json
@@ -23,8 +23,6 @@ class Settings:
     sleep_time: int
     log_folder: str
     log_level: str
-    user_to_own: Union[str, None]
-    group_to_own: Union[str, None]
 
 
 def walk(_path):
@@ -104,14 +102,6 @@ def files_sent(message: Message):
                 os.mkdir(folder)
             for attachment in message.attachments:
                 file_path = attachment.save(folder)
-                if settings.user_to_own is not None:
-                    os.system(
-                        ["sudo", "chown", settings.user_to_own, file_path])
-                if settings.group_to_own is not None:
-                    os.system(
-                        ["sudo", "chgroup", settings.user_to_own, file_path])
-                if settings.group_to_own is not None or settings.user_to_own is not None:
-                    os.system(["sudo", "chgroup", "777", file_path])
                 logger.debug(f"File saved to {file_path}")
         return
     except Exception as ex:
@@ -151,8 +141,7 @@ def load():
         _settings = json.load(f)
     global settings
     settings = Settings(_settings["saved"], _settings["folder_from"], _settings["folder_to"],
-                        _settings["folders_for_admins"], _settings["sleep_time"], _settings["log_folder"],
-                        _settings["log_level"], _settings["user_to_own"], _settings["group_to_own"])
+                        _settings["folders_for_admins"], _settings["sleep_time"], _settings["log_folder"])
 
 
 def main():
