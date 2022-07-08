@@ -141,7 +141,7 @@ def load():
         _settings = json.load(f)
     global settings
     settings = Settings(_settings["saved"], _settings["folder_from"], _settings["folder_to"],
-                        _settings["folders_for_admins"], _settings["sleep_time"], _settings["log_folder"])
+                        _settings["folders_for_admins"], _settings["sleep_time"], _settings["log_folder"], _settings["log_level"])
 
 
 def main():
