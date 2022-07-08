@@ -1,23 +1,29 @@
-import smdb_api, logger, time, json, os, writer, platform
-import PySimpleGUI as sg
+from dataclasses import dataclass
+from typing import Dict, List
+from smdb_api import API, Message
+import time
+import json
+import os
+import sys
 from datetime import datetime, timedelta
 from hashlib import md5
+from smdb_logger import Logger
 
-lg = logger.logger("backup")
-saved = ""
-folder_from = ""
-folder_to = ""
-folders_for_admins = {}
-api = smdb_api.API("Backup", "705663eec52de5a580c48a2a42c11b050dbfc40b475c9900e1475fe4b1a4fdc2")
+service_mode = True if sys.argv[-1] == "SERVICE" else False
+logger = Logger(
+    "smdb_backup.log", level="DEBUG", log_folder=("/var/log" if service_mode else "."), log_to_console=True, storage_life_extender_mode=True)
 
-def split(text, error=False, log_only=False, print_only=False):
-    """Logs to both stdout and a log file, using both the writer, and the logger module
-    """
-    if not log_only: writer.write(text)
-    if not print_only: lg.log(text, error=error)
 
-writer = writer.writer("Backup")
-print = split   #Changed print to the split function
+@dataclass
+class Settings:
+    saved: str
+    folder_from: str
+    folder_to: str
+    folders_for_admins: Dict[str, List[str]]
+    sleep_time: int
+    log_folder: str
+    log_level: str
+
 
 def walk(_path):
     _files = {}
@@ -25,128 +31,142 @@ def walk(_path):
         for fname in os.listdir(_path):
             inner_path = os.path.join(_path, fname)
             if os.path.isfile(inner_path):
-                _files[os.path.abspath(inner_path)] = os.path.getmtime(inner_path)
+                _files[os.path.abspath(inner_path)] = os.path.getmtime(
+                    inner_path)
             else:
                 _files.update(walk(inner_path))
         else:
             return _files
     except Exception as ex:
-        print(f"Exception occured in 'walk': {type(ex)} -> {ex}", error=True)
+        logger.error(f"Exception occured in 'walk': {type(ex)} -> {ex}")
+
 
 def check_folder(folder):
     if os.path.exists(folder):
         content = md5(str(walk(folder)).encode(encoding='utf-8')).hexdigest()
-        print(f"{content} --> {saved}", print_only=True)
+        logger.debug(f"{content} --> {settings.saved}")
         try:
-            if content != saved:
+            if content != settings.saved:
                 create_backup(content, folder)
         except Exception as ex:
-            print(f"Error occured in 'check_folder': {type(ex)} -> {ex}", error=True)
+            logger.error(
+                f"Error occured in 'check_folder': {type(ex)} -> {ex}")
             create_backup(content, folder)
     else:
-        print("Folder not found!")
+        logger.error(f"Folder '{folder}' not found!")
 
-def old_backup(limit=31536000): #1 év
+
+def old_backup(limit=31536000):  # 1 év
     try:
-        obc = walk(folder_to)
+        obc = walk(settings.folder_to)
         for key, value in obc.items():
-            print(f"Comparing {datetime.now()} --> {datetime.fromtimestamp(value)}", print_only=True)
+            logger.debug(
+                f"Comparing {datetime.now()} --> {datetime.fromtimestamp(value)}")
             if datetime.now() - datetime.fromtimestamp(value) >= timedelta(seconds=limit):
-                print(f"'{key}' was older than the limit ({timedelta(seconds=limit)})", log_only=True)
+                logger.info(
+                    f"'{key}' was older than the limit ({timedelta(seconds=limit)})")
                 os.remove(key)
     except Exception as ex:
-        print(f"Error occured in 'old_backup': {type(ex)} -> {ex}", error=True)
+        logger.error(f"Error occured in 'old_backup': {type(ex)} -> {ex}")
+
 
 def create_backup(status, folder):
     import shutil
-    print("Creating backup", print_only=True)
-    shutil.make_archive(os.path.join(folder_to, f"Backup-{datetime.now().date()}"), 'zip', root_dir=f"{folder}")
-    print("Backup created!")
+    backup_name = os.path.join(
+        settings.folder_to, f"Backup-{datetime.now().date()}")
+    logger.debug(f"Creating backup to '{backup_name}'")
+    shutil.make_archive(backup_name, 'zip', root_dir=f"{folder}")
+    logger.info("Backup created!")
     save_status(status)
     old_backup()
 
+
 def save_status(status):
-    global saved
-    saved = status
+    settings.saved = status
     save_settings()
+
 
 def save_settings():
-    with open("backup.cfg", "w", encoding="utf-8") as f:
-        json.dump({"saved": saved, "folder_from": folder_from, "folder_to": folder_to, "folder_for_admins": folders_for_admins}, f)
-        
-def files_sent(message):
+    with open("settings.cfg", "w", encoding="utf-8") as f:
+        json.dump(settings.__dict__, f)
+
+
+def files_sent(message: Message):
     if api.is_admin(message.sender) and message.has_attachments():
-        print(f"Incoming file from user {api.get_username(message.sender)}", print_only=True)
-        folder = os.path.join(folder_from, folders_for_admins[message.sender], message.content if message.content is not None else "")
-        if not os.path.exists(folder): os.mkdir(folder)
+        logger.debug(
+            f"Incoming file from user {api.get_username(message.sender)}")
+        folder = os.path.join(
+            settings.folder_from, settings.folders_for_admins[message.sender], message.content if message.content is not None else "")
+        if not os.path.exists(folder):
+            os.mkdir(folder)
         for attachment in message.attachments:
             file_path = attachment.save(folder)
-            print(f"File saved to {file_path}", log_only=True)
+            logger.debug(f"File saved to {file_path}")
     return
 
-def add_admin_folder(message):
+
+def add_admin_folder(message: Message):
     if api.is_admin(message.sender):
-        folders_for_admins[message.sender] = message.content
-        if not os.path.exists(os.path.join(folder_from, message.content)): os.mkdir(os.path.join(folder_from, message.content))
+        settings.folders_for_admins[message.sender] = message.content
+        if not os.path.exists(os.path.join(settings.folder_from, message.content)):
+            os.mkdir(os.path.join(settings.folder_from, message.content))
     save_settings()
     return
 
-class UI:
-    def __init__(self):
-        sg.theme("dark")
-        layout = [
-            [sg.Text(f"Select a folder where files are being saved:"), sg.FolderBrowse(key="folder_from")],
-            [sg.Text(f"Select a folder where files are going to be backed up to:"), sg.FolderBrowse(key="folder_to")],
-            [sg.Button("Save", key="SAVE")]
-        ]
-        self.window = sg.Window("Warning", layout, finalize=True, keep_on_top=True)
-        self.read = self.window.read
-        self.is_running = True
 
-    def close(self):
-        self.is_running = False
-        self.window.Close()
+def create_default_settings():
+    global settings
+    logger.debug("Creating default settings")
+    settings = Settings("", "FOLDER/FOR/UNZIPPED/FILES",
+                        "FOLDER/FOR/ZIP/SAVES", {}, 20, "/var/log", "INFO")
+    with open("settings.cfg", "w", encoding="utf-8") as f:
+        json.dump(settings.__dict__, f)
 
-    def work(self, event, values):
-        if event == sg.WINDOW_CLOSED:
-            self.close()
-        elif event == "SAVE":
-            with open("backup.cfg", "w", encoding="utf-8") as f:
-               json.dump({"saved": "", "folder_from": values["folder_from"], "folder_to": values["folder_to"], "folder_for_admins": {}}, f)
-            self.close()
 
-    def show(self):
-        while True:
-            event, values = self.read()
-            self.work(event, values)
-            if not self.is_running:
-                self.close()
-                break
-        
 def load():
-    if not os.path.exists("backup.cfg"): 
-        ui = UI()
-        ui.show()
-    if not os.path.exists("backup.cfg"): exit(1)
-    with open("backup.cfg", "r", encoding="utf-8") as f:
-        settings = json.load(f)
-    global saved
-    global folder_from
-    global folder_to
-    global folders_for_admins
-    saved = settings["saved"]
-    folder_from = settings["folder_from"].replace("/", "\\") if platform.system() == "Windows" else settings["folder_from"]
-    folder_to = settings["folder_to"].replace("/", "\\") if platform.system() == "Windows" else settings["folder_to"]
-    folders_for_admins = settings["folder_for_admins"]
+    cfg_path = "settings.cfg"
+    if not os.path.exists(cfg_path):
+        logger.error("Settings file not found!")
+        create_default_settings()
+        logger.info(
+            f"Default settings file created, you can find it in {os.path.abspath(os.path.curdir)}/settings.cfg")
+        exit(1)
+    with open(cfg_path, "r", encoding="utf-8") as f:
+        _settings = json.load(f)
+    global settings
+    settings = Settings(_settings["saved"], _settings["folder_from"], _settings["folder_to"],
+                        _settings["folders_for_admins"], _settings["sleep_time"], _settings["log_folder"], _settings["log_level"])
 
-def main(sleep_time):
+
+def main():
     api.validate()
-    load()
-    api.create_function("Backup", "Creates a backup of the sent file in the admin user's folder.\nUsage: &Backup <additional folder name if needed> [attached file(s)]\nCategory: HARDWARE", files_sent)
-    api.create_function("AddAdmin", "Adds a folder for the admin user.\nUsage: &AddAdmin <folder name for the admin user>\nCategory: HARDWARE", add_admin_folder)
+    api.create_function(
+        "Backup", "Creates a backup of the sent file in the admin user's folder.\nUsage: &Backup <additional folder name under your folder if needed> [attached file(s)]\nCategory: HARDWARE", files_sent)
+    api.create_function(
+        "AddAdmin", "Adds a folder for the admin user.\nUsage: &AddAdmin <folder name for the admin user>\nCategory: HARDWARE", add_admin_folder)
+    logger.debug("Api calls created")
     while True:
-        check_folder(folder_from)
-        time.sleep(sleep_time)
+        check_folder(settings.folder_from)
+        time.sleep(settings.sleep_time)
+
 
 if __name__ == "__main__":
-    main(int(os.sys.argv[1]) if len(os.sys.argv) > 1 else 20)
+    api = API(
+        "Backup", "705663eec52de5a580c48a2a42c11b050dbfc40b475c9900e1475fe4b1a4fdc2")
+    settings: Settings
+    logger.header(
+        f"Started in {'service' if service_mode else 'console'} mode")
+    try:
+        load()
+        logger.debug("Settings loaded")
+        logger.log_folder = settings.log_folder
+        logger.set_level(level=settings.log_level)
+        logger.flush_buffer()
+        logger.storage_life_extender_mode = False
+        main()
+    except KeyboardInterrupt:
+        logger.info("User stopped the program")
+    except Exception as ex:
+        logger.error(f"Exception happaned: {ex}")
+    finally:
+        logger.flush_buffer()

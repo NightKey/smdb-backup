@@ -1,4 +1,5 @@
-*.lg
+*.log
 *.cfg
 *.json
 *__py*
+test*

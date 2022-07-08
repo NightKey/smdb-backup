@@ -1,0 +1,13 @@
+[Unit]
+Description=Keep server awake
+After=multi-user.target
+
+[Service]
+Type=simple
+Restart=always
+
+WorkingDirectory=<folder_path>
+ExecStart=/usr/bin/python3 <file_name>
+
+[Install]
+WantedBy=multi-user.target
