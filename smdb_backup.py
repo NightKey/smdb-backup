@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Union
 from smdb_api import API, Message
 import time
 import json
@@ -23,6 +23,8 @@ class Settings:
     sleep_time: int
     log_folder: str
     log_level: str
+    user_to_own: Union[str, None]
+    group_to_own: Union[str, None]
 
 
 def walk(_path):
@@ -92,26 +94,40 @@ def save_settings():
 
 
 def files_sent(message: Message):
-    if api.is_admin(message.sender) and message.has_attachments():
-        logger.debug(
-            f"Incoming file from user {api.get_username(message.sender)}")
-        folder = os.path.join(
-            settings.folder_from, settings.folders_for_admins[message.sender], message.content if message.content is not None else "")
-        if not os.path.exists(folder):
-            os.mkdir(folder)
-        for attachment in message.attachments:
-            file_path = attachment.save(folder)
-            logger.debug(f"File saved to {file_path}")
-    return
+    try:
+        if api.is_admin(message.sender) and message.has_attachments():
+            logger.debug(
+                f"Incoming file from user {api.get_username(message.sender)}")
+            folder = os.path.join(
+                settings.folder_from, settings.folders_for_admins[message.sender], message.content if message.content is not None else "")
+            if not os.path.exists(folder):
+                os.mkdir(folder)
+            for attachment in message.attachments:
+                file_path = attachment.save(folder)
+                if settings.user_to_own is not None:
+                    os.system(
+                        ["sudo", "chown", settings.user_to_own, file_path])
+                if settings.group_to_own is not None:
+                    os.system(
+                        ["sudo", "chgroup", settings.user_to_own, file_path])
+                if settings.group_to_own is not None or settings.user_to_own is not None:
+                    os.system(["sudo", "chgroup" "777", file_path])
+                logger.debug(f"File saved to {file_path}")
+        return
+    except Exception as ex:
+        logger.error(f"Error in downloading file: {ex}")
 
 
 def add_admin_folder(message: Message):
-    if api.is_admin(message.sender):
-        settings.folders_for_admins[message.sender] = message.content
-        if not os.path.exists(os.path.join(settings.folder_from, message.content)):
-            os.mkdir(os.path.join(settings.folder_from, message.content))
-    save_settings()
-    return
+    try:
+        if api.is_admin(message.sender):
+            settings.folders_for_admins[message.sender] = message.content
+            if not os.path.exists(os.path.join(settings.folder_from, message.content)):
+                os.mkdir(os.path.join(settings.folder_from, message.content))
+        save_settings()
+        return
+    except Exception as ex:
+        logger.error(f"Error in adding admin: {ex}")
 
 
 def create_default_settings():
@@ -135,7 +151,8 @@ def load():
         _settings = json.load(f)
     global settings
     settings = Settings(_settings["saved"], _settings["folder_from"], _settings["folder_to"],
-                        _settings["folders_for_admins"], _settings["sleep_time"], _settings["log_folder"], _settings["log_level"])
+                        _settings["folders_for_admins"], _settings["sleep_time"], _settings["log_folder"],
+                        _settings["log_level"], _settings["user_to_own"], _settings["group_to_own"])
 
 
 def main():
