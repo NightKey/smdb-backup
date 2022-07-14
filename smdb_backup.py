@@ -11,7 +11,7 @@ from smdb_logger import Logger
 
 service_mode = True if sys.argv[-1] == "SERVICE" else False
 logger = Logger(
-    "smdb_backup.log", level="DEBUG", log_folder=("/var/log" if service_mode else "."), log_to_console=True, storage_life_extender_mode=True)
+    "smdb_backup.log", level="DEBUG", log_folder=("/var/log" if service_mode else "."), log_to_console=True, storage_life_extender_mode=True, max_logfile_size=500)
 
 
 @dataclass
@@ -59,6 +59,10 @@ def check_folder(folder):
 def old_backup(limit=31536000):  # 1 év
     try:
         obc = walk(settings.folder_to)
+        if len(list(obc.values)) == 1:
+            logger.info(
+                "Only one item was in the folder, not removing anything!")
+            return
         for key, value in obc.items():
             logger.debug(
                 f"Comparing {datetime.now()} --> {datetime.fromtimestamp(value)}")
