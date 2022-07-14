@@ -11,7 +11,7 @@ from smdb_logger import Logger
 
 service_mode = True if sys.argv[-1] == "SERVICE" else False
 logger = Logger(
-    "smdb_backup.log", level="DEBUG", log_folder=("." if service_mode else "."), log_to_console=True, storage_life_extender_mode=True, max_logfile_size=500)
+    "smdb_backup.log", level="DEBUG", log_folder=("/var/log" if service_mode else "."), log_to_console=True, storage_life_extender_mode=True, max_logfile_size=500)
 
 
 @dataclass
