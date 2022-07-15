@@ -169,7 +169,7 @@ if __name__ == "__main__":
     try:
         load()
         logger.debug("Settings loaded")
-        logger.log_folder = settings.log_folder
+        logger.set_folder(settings.log_folder)
         logger.set_level(level=settings.log_level)
         logger.flush_buffer()
         logger.storage_life_extender_mode = False
