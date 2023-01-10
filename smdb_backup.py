@@ -25,7 +25,7 @@ class Settings:
     log_level: str
 
 
-def walk(_path):
+def walk(_path) -> dict[str, float]:
     _files = {}
     try:
         for fname in os.listdir(_path):
@@ -59,17 +59,17 @@ def check_folder(folder):
 def old_backup(limit=31536000):  # 1 év
     try:
         obc = walk(settings.folder_to)
-        if len(list(obc.values)) == 1:
+        if len(list(obc.values())) == 1:
             logger.info(
                 "Only one item was in the folder, not removing anything!")
             return
-        for key, value in obc.items():
+        for file_path, creation_time in obc.items():
             logger.debug(
-                f"Comparing {datetime.now()} --> {datetime.fromtimestamp(value)}")
-            if datetime.now() - datetime.fromtimestamp(value) >= timedelta(seconds=limit):
+                f"Comparing {datetime.now()} --> {datetime.fromtimestamp(creation_time)}")
+            if datetime.now() - datetime.fromtimestamp(creation_time) >= timedelta(seconds=limit):
                 logger.info(
-                    f"'{key}' was older than the limit ({timedelta(seconds=limit)})")
-                os.remove(key)
+                    f"'{file_path}' was older than the limit ({timedelta(seconds=limit)})")
+                os.remove(file_path)
     except Exception as ex:
         logger.error(f"Error occured in 'old_backup': {type(ex)} -> {ex}")
 
