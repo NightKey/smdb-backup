@@ -25,7 +25,7 @@ class Settings:
     log_level: str
 
 
-def walk(_path) -> dict[str, float]:
+def walk(_path) -> Dict[str, float]:
     _files = {}
     try:
         for fname in os.listdir(_path):
