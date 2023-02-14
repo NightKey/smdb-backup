@@ -23,6 +23,7 @@ class Settings:
     sleep_time: int
     log_folder: str
     log_level: str
+    file_retention_time: int
 
 
 def walk(_path) -> Dict[str, float]:
@@ -56,7 +57,7 @@ def check_folder(folder):
         logger.error(f"Folder '{folder}' not found!")
 
 
-def old_backup(limit=31536000):  # 1 év
+def old_backup(limit):
     try:
         obc = walk(settings.folder_to)
         if len(list(obc.values())) == 1:
@@ -66,9 +67,9 @@ def old_backup(limit=31536000):  # 1 év
         for file_path, creation_time in obc.items():
             logger.debug(
                 f"Comparing {datetime.now()} --> {datetime.fromtimestamp(creation_time)}")
-            if datetime.now() - datetime.fromtimestamp(creation_time) >= timedelta(seconds=limit):
+            if datetime.now() - datetime.fromtimestamp(creation_time) >= timedelta(hours=limit):
                 logger.info(
-                    f"'{file_path}' was older than the limit ({timedelta(seconds=limit)})")
+                    f"'{file_path}' was older than the limit ({timedelta(hours=limit)})")
                 os.remove(file_path)
     except Exception as ex:
         logger.error(f"Error occured in 'old_backup': {type(ex)} -> {ex}")
@@ -128,12 +129,13 @@ def create_default_settings():
     global settings
     logger.debug("Creating default settings")
     settings = Settings("", "FOLDER/FOR/UNZIPPED/FILES",
-                        "FOLDER/FOR/ZIP/SAVES", {}, 20, "/var/log", "INFO")
+                        "FOLDER/FOR/ZIP/SAVES", {}, 20, "/var/log", "INFO", 8760)
     with open("settings.cfg", "w", encoding="utf-8") as f:
         json.dump(settings.__dict__, f)
 
 
 def load():
+    old_setting_file = False
     cfg_path = "settings.cfg"
     if not os.path.exists(cfg_path):
         logger.error("Settings file not found!")
@@ -143,9 +145,14 @@ def load():
         exit(1)
     with open(cfg_path, "r", encoding="utf-8") as f:
         _settings = json.load(f)
+    if "file_retention_time" not in _settings:
+        _settings["file_retention_time"] = 8760
+        old_setting_file = True
     global settings
     settings = Settings(_settings["saved"], _settings["folder_from"], _settings["folder_to"],
-                        _settings["folders_for_admins"], _settings["sleep_time"], _settings["log_folder"], _settings["log_level"])
+                        _settings["folders_for_admins"], _settings["sleep_time"], _settings["log_folder"], _settings["log_level"], _settings["file_retention_time"])
+    if (old_setting_file):
+        save_settings()
 
 
 def main():
