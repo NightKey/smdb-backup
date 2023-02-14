@@ -83,7 +83,7 @@ def create_backup(status, folder):
     shutil.make_archive(backup_name, 'zip', root_dir=f"{folder}")
     logger.info("Backup created!")
     save_status(status)
-    old_backup()
+    old_backup(settings.file_retention_time)
 
 
 def save_status(status):
