@@ -173,6 +173,7 @@ if __name__ == "__main__":
     settings: Settings
     logger.header(
         f"Started in {'service' if service_mode else 'console'} mode")
+    reason = ""
     try:
         load()
         logger.debug("Settings loaded")
@@ -180,7 +181,6 @@ if __name__ == "__main__":
         logger.set_level(level=settings.log_level)
         logger.flush_buffer()
         logger.storage_life_extender_mode = False
-        reason = ""
         main()
     except KeyboardInterrupt:
         logger.info("User stopped the program")
