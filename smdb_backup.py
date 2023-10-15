@@ -40,6 +40,8 @@ def walk(_path) -> Dict[str, float]:
             return _files
     except Exception as ex:
         logger.error(f"Exception occured in 'walk': {type(ex)} -> {ex}")
+    finally:
+        return _files
 
 
 def check_folder(folder):
