@@ -45,7 +45,7 @@ def walk(_path) -> Dict[str, float]:
 
 def try_read_file(inner_path):
     try:
-        return ([os.path.abspath(inner_path)], os.path.getmtime(inner_path))
+        return (os.path.abspath(inner_path), os.path.getmtime(inner_path))
     except PermissionError as pe:
         logger.warning(f"'walk' can not access '{pe.filename}'")
 
