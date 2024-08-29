@@ -32,8 +32,8 @@ def walk(_path) -> Dict[str, float]:
         for fname in os.listdir(_path):
             inner_path = os.path.join(_path, fname)
             if os.path.isfile(inner_path):
-                _files[os.path.abspath(inner_path)] = os.path.getmtime(
-                    inner_path)
+                key, value = try_read_file(inner_path)
+                _files[key] = value
             else:
                 _files.update(walk(inner_path))
         else:
@@ -43,6 +43,11 @@ def walk(_path) -> Dict[str, float]:
     finally:
         return _files
 
+def try_read_file(inner_path):
+    try:
+        return ([os.path.abspath(inner_path)], os.path.getmtime(inner_path))
+    except PermissionError as pe:
+        logger.warning(f"'walk' can not access '{pe.filename}'")
 
 def check_folder(folder):
     if os.path.exists(folder):
